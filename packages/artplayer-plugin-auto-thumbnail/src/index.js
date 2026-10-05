@@ -1,6 +1,15 @@
+let cachedVideo = null
+
 function create({ url, width, number }, callback) {
-  const video = document.createElement('video')
+  // Reuse one element across metadata loads instead of growing a new
+  // <video> per call (todo O5).
+  cachedVideo ||= document.createElement('video')
+  const video = cachedVideo
   video.crossOrigin = 'anonymous'
+  video.onerror = () => {
+    console.warn(`[artplayerPluginAutoThumbnail] failed to load ${url}`)
+    video.onseeked = null
+  }
   video.src = url
 
   video.onloadedmetadata = () => {
@@ -16,6 +25,8 @@ function create({ url, width, number }, callback) {
 
     function seekAndDraw(index) {
       canvas.toBlob((blob) => {
+        if (!blob)
+          return
         URL.revokeObjectURL(blobUrl)
         blobUrl = URL.createObjectURL(blob)
 
@@ -30,7 +41,14 @@ function create({ url, width, number }, callback) {
       video.currentTime = (duration * index) / number
 
       video.onseeked = () => {
-        ctx.drawImage(video, (index % 10) * width, Math.floor(index / 10) * height, width, height)
+        try {
+          ctx.drawImage(video, (index % 10) * width, Math.floor(index / 10) * height, width, height)
+        }
+        catch (error) {
+          console.warn('[artplayerPluginAutoThumbnail] draw failed:', error)
+          video.onseeked = null
+          return
+        }
         seekAndDraw(index + 1)
       }
     }
