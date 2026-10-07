@@ -58,7 +58,11 @@ function createElement(tag) {
     insertAdjacentHTML() {},
     insertAdjacentElement() {},
     appendChild() {},
-    querySelector: () => createElement('div'),
+    querySelector(sel) {
+      this.__children ||= {}
+      this.__children[sel] ||= createElement('div')
+      return this.__children[sel]
+    },
     parentNode: { removeChild() {} },
   }
 }
@@ -132,7 +136,9 @@ test('C7: autoPlayback throttles storage writes and registers click handlers onc
 
     // Master bug: every restart re-registered the close/jump click handlers.
     for (let index = 0; index < 5; index++) art.emit('restart')
-    const closeClicks = proxies.filter(entry => entry.name === 'click').length
+    const closeClicks = proxies.filter(
+      entry => entry.name === 'click' && entry.target === $autoPlayback.__children['.art-auto-playback-close'],
+    ).length
     assert.equal(closeClicks, 1, 'click handlers must be registered once, not per restart')
   }
   finally {
