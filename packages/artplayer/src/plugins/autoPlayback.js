@@ -26,6 +26,7 @@ export default function autoPlayback(art) {
 
   let timer = null
   let savedTime = 0
+  let lastSeenTime = 0
   let lastSaved = 0
 
   art.on('video:timeupdate', () => {
@@ -50,9 +51,11 @@ export default function autoPlayback(art) {
   })
 
   proxy($jump, 'click', () => {
-    if (savedTime < constructor.AUTO_PLAYBACK_MIN)
+    if (lastSeenTime < constructor.AUTO_PLAYBACK_MIN)
       return
-    art.seek = savedTime
+    // Jump restores the position recorded when the popup was shown, not the
+    // live playhead (which kept moving while the popup was visible).
+    art.seek = lastSeenTime
     silencePromise(art.play())
     setStyle($poster, 'display', 'none')
     setStyle($autoPlayback, 'display', 'none')
@@ -60,7 +63,7 @@ export default function autoPlayback(art) {
 
   function init() {
     const times = storage.get('times') || {}
-    savedTime = times[art.option.id || art.option.url] || 0
+    lastSeenTime = times[art.option.id || art.option.url] || 0
 
     clearTimeout(timer)
     setStyle($autoPlayback, 'display', 'none')

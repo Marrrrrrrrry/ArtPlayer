@@ -3717,6 +3717,7 @@ function autoPlayback(art) {
   append($close, icons.close);
   let timer = null;
   let savedTime = 0;
+  let lastSeenTime = 0;
   let lastSaved = 0;
   art.on("video:timeupdate", () => {
     if (!art.playing)
@@ -3738,16 +3739,16 @@ function autoPlayback(art) {
     setStyle($autoPlayback, "display", "none");
   });
   proxy($jump, "click", () => {
-    if (savedTime < constructor.AUTO_PLAYBACK_MIN)
+    if (lastSeenTime < constructor.AUTO_PLAYBACK_MIN)
       return;
-    art.seek = savedTime;
+    art.seek = lastSeenTime;
     silencePromise(art.play());
     setStyle($poster, "display", "none");
     setStyle($autoPlayback, "display", "none");
   });
   function init() {
     const times = storage.get("times") || {};
-    savedTime = times[art.option.id || art.option.url] || 0;
+    lastSeenTime = times[art.option.id || art.option.url] || 0;
     clearTimeout(timer);
     setStyle($autoPlayback, "display", "none");
     if (savedTime && savedTime >= constructor.AUTO_PLAYBACK_MIN) {
