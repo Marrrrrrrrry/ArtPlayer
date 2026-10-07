@@ -130,8 +130,23 @@ class Danmuku {
     this.index = 0;
     this.option = Danmuku.option;
     this.states = { wait: [], ready: [], emit: [], stop: [] };
+    this._rafRunning = false;
+    this._msgId = 0;
+    this._pending = /* @__PURE__ */ new Map();
     this.config(option, true);
     this.worker = new WorkerWrapper();
+    this.worker.onmessage = (event) => {
+      const { data } = event;
+      const resolve = this._pending.get(data.id);
+      if (resolve) {
+        this._pending.delete(data.id);
+        resolve(data);
+      }
+    };
+    this.worker.onerror = () => {
+      this._pending.forEach((resolve) => resolve({ result: void 0 }));
+      this._pending.clear();
+    };
     this.start = this.start.bind(this);
     this.stop = this.stop.bind(this);
     this.reset = this.reset.bind(this);
@@ -143,7 +158,8 @@ class Danmuku {
     art.on("video:waiting", this.stop);
     art.on("destroy", this.destroy);
     art.on("resize", this.resize);
-    this.load();
+    this.load().catch(() => {
+    });
   }
   // 默认配置
   static get option() {
@@ -446,7 +462,13 @@ class Danmuku {
     const { clamp } = this.utils;
     const { $controlsCenter } = this.art.template;
     const changed = Object.keys(option).some(
-      (key) => JSON.stringify(this.option[key]) !== JSON.stringify(option[key])
+      (key) => {
+        const prev = this.option[key];
+        const next = option[key];
+        if (typeof prev === "function" || typeof next === "function")
+          return prev !== next;
+        return JSON.stringify(prev) !== JSON.stringify(next);
+      }
     );
     if (!changed && !isInit)
       return this;
@@ -477,14 +499,9 @@ class Danmuku {
   // 复杂运算交给 Web Worker 处理
   postMessage(message = {}) {
     return new Promise((resolve) => {
-      message.id = Date.now();
+      message.id = ++this._msgId;
+      this._pending.set(message.id, resolve);
       this.worker.postMessage(message);
-      this.worker.onmessage = (event) => {
-        const { data } = event;
-        if (data.id === message.id) {
-          resolve(data);
-        }
-      };
     });
   }
   // 根据状态获取弹幕
@@ -521,81 +538,87 @@ class Danmuku {
   update() {
     const { setStyles } = this.utils;
     this.timer = window.requestAnimationFrame(async () => {
-      if (this.art.playing && !this.isHide) {
-        this.filter("emit", (danmu) => {
-          const emitTime = (Date.now() - danmu.$lastStartTime) / 1e3;
-          danmu.$restTime -= emitTime;
-          danmu.$lastStartTime = Date.now();
-          if (danmu.$restTime <= 0) {
-            this.makeWait(danmu);
-          }
-        });
-        const readys = this.readys;
-        for (let index = 0; index < readys.length; index++) {
-          const danmu = readys[index];
-          const state = await this.option.beforeVisible(danmu);
-          if (state) {
-            const { clientWidth, clientHeight } = this.$player;
-            danmu.$ref = this.$ref;
-            danmu.$ref.textContent = danmu.text;
-            this.$danmuku.appendChild(danmu.$ref);
-            danmu.$ref.style.opacity = this.option.opacity;
-            danmu.$ref.style.fontSize = `${this.fontSize}px`;
-            danmu.$ref.style.color = danmu.color;
-            danmu.$ref.style.border = danmu.border ? `1px solid ${danmu.color}` : null;
-            danmu.$ref.style.backgroundColor = danmu.border ? "rgb(0 0 0 / 50%)" : null;
-            setStyles(danmu.$ref, danmu.style);
+      try {
+        if (this.art.playing && !this.isHide) {
+          this.filter("emit", (danmu) => {
+            const emitTime = (Date.now() - danmu.$lastStartTime) / 1e3;
+            danmu.$restTime -= emitTime;
             danmu.$lastStartTime = Date.now();
-            danmu.$restTime = this.speed;
-            const distance = clientWidth + danmu.$ref.clientWidth;
-            const { result: top } = await this.postMessage({
-              type: "getDanmuTop",
-              target: {
-                mode: danmu.mode,
-                height: danmu.$ref.clientHeight,
-                speed: distance / danmu.$restTime
-              },
-              // 当前弹幕信息
-              visibles: this.visibles,
-              // 可见的弹幕的数据
-              antiOverlap: this.option.antiOverlap,
-              clientWidth,
-              clientHeight,
-              marginBottom: this.marginBottom,
-              marginTop: this.marginTop
-            });
-            if (danmu.$ref) {
-              if (!this.isStop && top !== void 0) {
-                this.setState(danmu, "emit");
-                danmu.$ref.style.top = `${top}px`;
-                danmu.$ref.style.visibility = "visible";
-                danmu.$ref.dataset.mode = danmu.mode;
-                danmu.$ref.dataset.id = danmu.id || "";
-                switch (danmu.mode) {
-                  // 滚动的弹幕
-                  case 0: {
-                    danmu.$ref.style.left = `${clientWidth}px`;
-                    danmu.$ref.style.marginLeft = "0px";
-                    danmu.$ref.style.transform = `translateX(${-distance}px)`;
-                    danmu.$ref.style.transition = `transform ${danmu.$restTime}s linear 0s`;
-                    break;
+            if (danmu.$restTime <= 0) {
+              this.makeWait(danmu);
+            }
+          });
+          const readys = this.readys;
+          for (let index = 0; index < readys.length; index++) {
+            const danmu = readys[index];
+            const state = await this.option.beforeVisible(danmu);
+            if (state) {
+              const { clientWidth, clientHeight } = this.$player;
+              danmu.$ref = this.$ref;
+              danmu.$ref.textContent = danmu.text;
+              this.$danmuku.appendChild(danmu.$ref);
+              danmu.$ref.style.opacity = this.option.opacity;
+              danmu.$ref.style.fontSize = `${this.fontSize}px`;
+              danmu.$ref.style.color = danmu.color;
+              danmu.$ref.style.border = danmu.border ? `1px solid ${danmu.color}` : null;
+              danmu.$ref.style.backgroundColor = danmu.border ? "rgb(0 0 0 / 50%)" : null;
+              setStyles(danmu.$ref, danmu.style);
+              danmu.$lastStartTime = Date.now();
+              danmu.$restTime = this.speed;
+              const distance = clientWidth + danmu.$ref.clientWidth;
+              const { result: top } = await this.postMessage({
+                type: "getDanmuTop",
+                target: {
+                  mode: danmu.mode,
+                  height: danmu.$ref.clientHeight,
+                  speed: distance / danmu.$restTime
+                },
+                // 当前弹幕信息
+                visibles: this.visibles,
+                // 可见的弹幕的数据
+                antiOverlap: this.option.antiOverlap,
+                clientWidth,
+                clientHeight,
+                marginBottom: this.marginBottom,
+                marginTop: this.marginTop
+              });
+              if (danmu.$ref) {
+                if (!this.isStop && top !== void 0) {
+                  this.setState(danmu, "emit");
+                  danmu.$ref.style.top = `${top}px`;
+                  danmu.$ref.style.visibility = "visible";
+                  danmu.$ref.dataset.mode = danmu.mode;
+                  danmu.$ref.dataset.id = danmu.id || "";
+                  switch (danmu.mode) {
+                    // 滚动的弹幕
+                    case 0: {
+                      danmu.$ref.style.left = `${clientWidth}px`;
+                      danmu.$ref.style.marginLeft = "0px";
+                      danmu.$ref.style.transform = `translateX(${-distance}px)`;
+                      danmu.$ref.style.transition = `transform ${danmu.$restTime}s linear 0s`;
+                      break;
+                    }
+                    case 1:
+                    // falls through
+                    case 2:
+                      danmu.$ref.style.left = "50%";
+                      danmu.$ref.style.marginLeft = `-${danmu.$ref.clientWidth / 2}px`;
+                      break;
+                    default:
+                      break;
                   }
-                  case 1:
-                  // falls through
-                  case 2:
-                    danmu.$ref.style.left = "50%";
-                    danmu.$ref.style.marginLeft = `-${danmu.$ref.clientWidth / 2}px`;
-                    break;
+                  this.art.emit("artplayerPluginDanmuku:visible", danmu);
+                } else {
+                  this.setState(danmu, "ready");
+                  this.$refs.push(danmu.$ref);
+                  danmu.$ref = null;
                 }
-                this.art.emit("artplayerPluginDanmuku:visible", danmu);
-              } else {
-                this.setState(danmu, "ready");
-                this.$refs.push(danmu.$ref);
-                danmu.$ref = null;
               }
             }
           }
         }
+      } catch (error) {
+        console.error("[artplayerPluginDanmuku] update error:", error);
       }
       if (!this.isStop) {
         this.update();
@@ -665,6 +688,7 @@ class Danmuku {
   }
   stop() {
     this.isStop = true;
+    this._rafRunning = false;
     this.suspend();
     window.cancelAnimationFrame(this.timer);
     this.art.emit("artplayerPluginDanmuku:stop");
@@ -673,7 +697,10 @@ class Danmuku {
   start() {
     this.isStop = false;
     this.continue();
-    this.update();
+    if (!this._rafRunning) {
+      this._rafRunning = true;
+      this.update();
+    }
     this.art.emit("artplayerPluginDanmuku:start");
     return this;
   }
@@ -703,7 +730,7 @@ class Danmuku {
     this.art.off("video:playing", this.start);
     this.art.off("video:pause", this.stop);
     this.art.off("video:waiting", this.stop);
-    this.art.off("resize", this.reset);
+    this.art.off("resize", this.resize);
     this.art.off("destroy", this.destroy);
     this.art.emit("artplayerPluginDanmuku:destroy");
   }
