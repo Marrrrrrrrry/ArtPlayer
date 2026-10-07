@@ -68,10 +68,10 @@ export default function autoPlayback(art) {
     clearTimeout(timer)
     setStyle($autoPlayback, 'display', 'none')
 
-    if (savedTime && savedTime >= constructor.AUTO_PLAYBACK_MIN) {
+    if (lastSeenTime && lastSeenTime >= constructor.AUTO_PLAYBACK_MIN) {
       setStyle($autoPlayback, 'display', 'flex')
 
-      $last.textContent = `${i18n.get('Last Seen')} ${secondToTime(savedTime)}`
+      $last.textContent = `${i18n.get('Last Seen')} ${secondToTime(lastSeenTime)}`
       $jump.textContent = i18n.get('Jump Play')
 
       art.once('video:timeupdate', () => {

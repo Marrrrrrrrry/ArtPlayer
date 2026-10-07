@@ -146,6 +146,54 @@ test('C7: autoPlayback throttles storage writes and registers click handlers onc
   }
 })
 
+test('TIP-1: autoPlayback popup must appear on first load when a last-seen time is stored', () => {
+  const originalGet = Storage.prototype.get
+  Storage.prototype.get = function get(key) {
+    if (!key)
+      return { times: { 'video-1': 42 } }
+    if (key === 'times')
+      return { 'video-1': 42 }
+    return undefined
+  }
+
+  const $autoPlayback = createElement('div')
+  const handlers = {}
+  const art = {
+    i18n: { get: key => key },
+    icons: { close: {} },
+    storage: new Storage(),
+    constructor: { AUTO_PLAYBACK_MAX: 10, AUTO_PLAYBACK_MIN: 5, AUTO_PLAYBACK_TIMEOUT: 3000 },
+    proxy: () => () => {},
+    on(name, cb) {
+      ;(handlers[name] ||= []).push(cb)
+    },
+    once() {},
+    emit(name) {
+      for (const cb of [...(handlers[name] || [])]) cb()
+    },
+    layers: { add: () => $autoPlayback },
+    playing: true,
+    currentTime: 0,
+    option: { id: 'video-1', url: 'video.mp4' },
+    template: { $poster: createElement('div') },
+  }
+  art.art = art
+
+  try {
+    autoPlayback(art)
+    art.emit('ready')
+
+    // Regression guard for the TIP-1 fix: the popup visibility check reads the
+    // stored last-seen position, not the live playhead (which is 0 on first
+    // load). The broken intermediate version never showed the popup.
+    assert.equal($autoPlayback.style.display, 'flex', 'popup must be visible when a last-seen position exists')
+    assert.match($autoPlayback.__children['.art-auto-playback-last'].textContent, /42/)
+  }
+  finally {
+    Storage.prototype.get = originalGet
+  }
+})
+
 test('C10: the pip getter must only report this player\'s video', () => {
   const pipElements = { value: null }
   globalThis.document = {
