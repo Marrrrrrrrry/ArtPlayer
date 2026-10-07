@@ -25,14 +25,12 @@ export default function autoPlayback(art) {
   append($close, icons.close)
 
   let timer = null
-  let savedTime = 0
   let lastSeenTime = 0
   let lastSaved = 0
 
   art.on('video:timeupdate', () => {
     if (!art.playing)
       return
-    savedTime = art.currentTime
     const now = Date.now()
     if (now - lastSaved < 3000)
       return

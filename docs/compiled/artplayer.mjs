@@ -3720,7 +3720,6 @@ function autoPlayback(art) {
   art.on("video:timeupdate", () => {
     if (!art.playing)
       return;
-    art.currentTime;
     const now = Date.now();
     if (now - lastSaved < 3e3)
       return;
