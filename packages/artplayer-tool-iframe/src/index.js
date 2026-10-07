@@ -113,7 +113,8 @@ export default class ArtplayerToolIframe {
         }
         else {
           if (this.injected) {
-            // Monotonic ids: Date.now() collided for same-millisecond commits
+            // Monotonic ids: Date.now() collided for posts sent in the same
+            // millisecond and the first promise never settled (todo O7).
             // and the first promise never settled (todo O7).
             const id = ++this._msgId
             this.promises[id] = { resove, reject }

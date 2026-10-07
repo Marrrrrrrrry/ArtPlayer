@@ -5,8 +5,12 @@
  * Released under the MIT License.
  */
 let cachedVideo = null;
+let cachedUrl = null;
 function create({ url, width, number }, callback) {
-  cachedVideo || (cachedVideo = document.createElement("video"));
+  if (!cachedVideo || cachedUrl !== url) {
+    cachedVideo = document.createElement("video");
+    cachedUrl = url;
+  }
   const video = cachedVideo;
   video.crossOrigin = "anonymous";
   video.onerror = () => {

@@ -1,9 +1,14 @@
 let cachedVideo = null
+let cachedUrl = null
 
 function create({ url, width, number }, callback) {
-  // Reuse one element across metadata loads instead of growing a new
-  // <video> per call (todo O5).
-  cachedVideo ||= document.createElement('video')
+  // Reuse one element per source url instead of growing a new <video> per
+  // call (todo O5). A different url gets a fresh element so concurrent
+  // players cannot interrupt each other's seek chain.
+  if (!cachedVideo || cachedUrl !== url) {
+    cachedVideo = document.createElement('video')
+    cachedUrl = url
+  }
   const video = cachedVideo
   video.crossOrigin = 'anonymous'
   video.onerror = () => {
