@@ -1478,7 +1478,6 @@ function volume$1(option) {
         let isDragging = false;
         const setVideoVolume = (value) => {
           $video.volume = clamp(value, 0, 1);
-          art.emit("video:volumechange");
         };
         proxy($slider, "mousedown", (event) => {
           isDragging = event.button === 0;
@@ -3716,13 +3715,12 @@ function autoPlayback(art) {
   const $close = query(".art-auto-playback-close", $autoPlayback);
   append($close, icons.close);
   let timer = null;
-  let savedTime = 0;
   let lastSeenTime = 0;
   let lastSaved = 0;
   art.on("video:timeupdate", () => {
     if (!art.playing)
       return;
-    savedTime = art.currentTime;
+    art.currentTime;
     const now = Date.now();
     if (now - lastSaved < 3e3)
       return;
@@ -3751,9 +3749,9 @@ function autoPlayback(art) {
     lastSeenTime = times[art.option.id || art.option.url] || 0;
     clearTimeout(timer);
     setStyle($autoPlayback, "display", "none");
-    if (savedTime && savedTime >= constructor.AUTO_PLAYBACK_MIN) {
+    if (lastSeenTime && lastSeenTime >= constructor.AUTO_PLAYBACK_MIN) {
       setStyle($autoPlayback, "display", "flex");
-      $last.textContent = `${i18n.get("Last Seen")} ${secondToTime(savedTime)}`;
+      $last.textContent = `${i18n.get("Last Seen")} ${secondToTime(lastSeenTime)}`;
       $jump.textContent = i18n.get("Jump Play");
       art.once("video:timeupdate", () => {
         timer = setTimeout(() => {

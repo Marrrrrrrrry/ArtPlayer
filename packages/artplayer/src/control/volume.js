@@ -58,10 +58,10 @@ export default function volume(option) {
         let isDragging = false
 
         // Drag updates the element directly so the notice and localStorage
-        // write only happen once when the drag finishes.
+        // write only happen once when the drag finishes. The element fires
+        // volumechange itself, which drives the control's update().
         const setVideoVolume = (value) => {
           $video.volume = clamp(value, 0, 1)
-          art.emit('video:volumechange')
         }
 
         proxy($slider, 'mousedown', (event) => {
