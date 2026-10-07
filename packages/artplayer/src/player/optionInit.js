@@ -25,7 +25,8 @@ export default function optionInit(art) {
   }
 
   if (option.poster) {
-    setStyle($poster, 'backgroundImage', `url(${option.poster})`)
+    const safePoster = String(option.poster).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+    setStyle($poster, 'backgroundImage', `url("${safePoster}")`)
   }
 
   if (option.autoplay) {
