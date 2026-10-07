@@ -71,6 +71,7 @@ export default function artplayerPluginAds(option) {
     let isEnd = false
     let isInit = false
     let isCanClose = false
+    let lockBeforeAd = false
 
     function getI18n(val, str) {
       return str.replace('%s', val)
@@ -81,7 +82,7 @@ export default function artplayerPluginAds(option) {
         return
       isEnd = true
       clearTimeout(timer)
-      art.isLock = false
+      art.isLock = lockBeforeAd
       silencePromise(art.play())
       if (option.video)
         $ads.pause()
@@ -247,7 +248,8 @@ export default function artplayerPluginAds(option) {
       show()
       art.pause()
       // Lock the player so hotkeys/gestures cannot drive the main video
-      // underneath the ad overlay; skip() unlocks.
+      // underneath the ad overlay; skip() restores the pre-ad state.
+      lockBeforeAd = art.isLock
       art.isLock = true
 
       if (option.video) {

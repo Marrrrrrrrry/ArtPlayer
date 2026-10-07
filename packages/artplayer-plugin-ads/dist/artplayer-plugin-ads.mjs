@@ -71,6 +71,7 @@ function artplayerPluginAds(option) {
     let isEnd = false;
     let isInit = false;
     let isCanClose = false;
+    let lockBeforeAd = false;
     function getI18n(val, str) {
       return str.replace("%s", val);
     }
@@ -79,7 +80,7 @@ function artplayerPluginAds(option) {
         return;
       isEnd = true;
       clearTimeout(timer);
-      art.isLock = false;
+      art.isLock = lockBeforeAd;
       silencePromise(art.play());
       if (option.video)
         $ads.pause();
@@ -207,6 +208,7 @@ function artplayerPluginAds(option) {
       isInit = true;
       show();
       art.pause();
+      lockBeforeAd = art.isLock;
       art.isLock = true;
       if (option.video) {
         art.proxy($ads, "error", skip);
