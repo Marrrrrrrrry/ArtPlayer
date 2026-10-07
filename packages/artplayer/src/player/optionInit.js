@@ -35,7 +35,8 @@ export default function optionInit(art) {
 
   if (option.playsInline) {
     $video.playsInline = true
-    $video['webkit-playsinline'] = true
+    // Legacy WebKit only honors the attribute form of webkit-playsinline.
+    $video.setAttribute('webkit-playsinline', '')
   }
 
   if (option.theme) {
