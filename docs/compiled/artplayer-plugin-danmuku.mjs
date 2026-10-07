@@ -60,25 +60,34 @@ function createWorker() {
   return new Worker(URL.createObjectURL(blob2));
 }
 function bilibiliDanmuParseFromUrl(url) {
-  return new Promise(async (resolve) => {
+  return (async () => {
     const res = await fetch(url);
+    if (!res.ok)
+      throw new Error(`[artplayerPluginDanmuku] danmaku request failed: ${res.status} ${url}`);
     const xml = await res.text();
-    try {
-      const worker = createWorker();
-      worker.onmessage = (event) => {
-        const { danmus, id } = event.data;
-        if (!id || !danmus)
-          return;
-        resolve(danmus);
-        worker.terminate();
-      };
-      worker.postMessage({ xml, id: Date.now() });
-    } catch (error) {
-      console.error("Error parsing Bilibili Danmu:", error);
-      const danmus = bilibiliDanmuParseFromXml(xml);
-      resolve(danmus);
-    }
-  });
+    return await new Promise((resolve, reject) => {
+      try {
+        const worker = createWorker();
+        const timeout = setTimeout(() => reject(new Error("danmaku parse timeout")), 1e4);
+        worker.onmessage = (event) => {
+          const { danmus, id } = event.data;
+          if (!id || !danmus)
+            return;
+          clearTimeout(timeout);
+          resolve(danmus);
+          worker.terminate();
+        };
+        worker.onerror = (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        };
+        worker.postMessage({ xml, id: Date.now() });
+      } catch (error) {
+        console.error("Error parsing Bilibili Danmu:", error);
+        resolve(bilibiliDanmuParseFromXml(xml));
+      }
+    });
+  })();
 }
 const jsContent = '/*!\n * artplayer-plugin-danmuku.js v5.3.0\n * Github: https://github.com/zhw2590582/ArtPlayer\n * (c) 2017-2026 Harvey Zhao\n * Released under the MIT License.\n */\nfunction getDanmuTop({ target, visibles, clientWidth, clientHeight, marginBottom, marginTop, antiOverlap }) {\n  const maxTop = clientHeight - marginBottom;\n  const danmus = visibles.filter((item) => item.mode === target.mode && item.top <= maxTop).sort((prev, next) => prev.top - next.top);\n  if (danmus.length === 0) {\n    if (target.mode === 2) {\n      return maxTop - target.height;\n    } else {\n      return marginTop;\n    }\n  }\n  danmus.unshift({\n    type: "top",\n    top: 0,\n    left: 0,\n    right: 0,\n    height: marginTop,\n    width: clientWidth,\n    speed: 0,\n    distance: clientWidth\n  });\n  danmus.push({\n    type: "bottom",\n    top: maxTop,\n    left: 0,\n    right: 0,\n    height: marginBottom,\n    width: clientWidth,\n    speed: 0,\n    distance: clientWidth\n  });\n  if (target.mode === 2) {\n    for (let index = danmus.length - 2; index >= 0; index -= 1) {\n      const item = danmus[index];\n      const prev = danmus[index + 1];\n      const itemBottom = item.top + item.height;\n      const diff = prev.top - itemBottom;\n      if (diff >= target.height) {\n        return prev.top - target.height;\n      }\n    }\n  } else {\n    for (let index = 1; index < danmus.length; index += 1) {\n      const item = danmus[index];\n      const prev = danmus[index - 1];\n      const prevBottom = prev.top + prev.height;\n      const diff = item.top - prevBottom;\n      if (diff >= target.height) {\n        return prevBottom;\n      }\n    }\n  }\n  const topMap = [];\n  for (let index = 1; index < danmus.length - 1; index += 1) {\n    const item = danmus[index];\n    if (topMap.length) {\n      const last = topMap[topMap.length - 1];\n      if (last[0].top === item.top) {\n        last.push(item);\n      } else {\n        topMap.push([item]);\n      }\n    } else {\n      topMap.push([item]);\n    }\n  }\n  if (antiOverlap) {\n    switch (target.mode) {\n      case 0: {\n        const result = topMap.find((list) => {\n          return list.every((danmu) => {\n            if (clientWidth < danmu.distance)\n              return false;\n            if (target.speed < danmu.speed)\n              return true;\n            const overlapTime = danmu.right / (target.speed - danmu.speed);\n            if (overlapTime > danmu.time)\n              return true;\n            return false;\n          });\n        });\n        return result && result[0] ? result[0].top : void 0;\n      }\n      // 静止弹幕没有重叠问题\n      case 1:\n      case 2:\n        return void 0;\n    }\n  } else {\n    switch (target.mode) {\n      case 0:\n        topMap.sort((prev, next) => {\n          const nextMinRight = Math.min(...next.map((item) => item.right));\n          const prevMinRight = Math.min(...prev.map((item) => item.right));\n          return nextMinRight * next.length - prevMinRight * prev.length;\n        });\n        break;\n      case 1:\n      case 2:\n        topMap.sort((prev, next) => {\n          const nextMaxWidth = Math.max(...next.map((item) => item.width));\n          const prevMaxWidth = Math.max(...prev.map((item) => item.width));\n          return prevMaxWidth * prev.length - nextMaxWidth * next.length;\n        });\n        break;\n    }\n    return topMap[0][0].top;\n  }\n}\nonmessage = (event) => {\n  const { data } = event;\n  if (!data.id || !data.type)\n    return;\n  const fns = { getDanmuTop };\n  const fn = fns[data.type];\n  const result = fn(data);\n  globalThis.postMessage({\n    result,\n    id: data.id\n  });\n};\n';
 const blob = typeof self !== "undefined" && self.Blob && new Blob(["URL.revokeObjectURL(import.meta.url);", jsContent], { type: "text/javascript;charset=utf-8" });
