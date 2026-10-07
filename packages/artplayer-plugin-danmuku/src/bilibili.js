@@ -77,7 +77,8 @@ export function bilibiliDanmuParseFromUrl(url) {
     return await new Promise((resolve, reject) => {
       try {
         const worker = createWorker()
-        const timeout = setTimeout(() => reject(new Error('danmaku parse timeout')), 10000)
+        const timeout = setTimeout(() => reject(new Error('danmuku parse timeout')), 10000)
+        worker.terminate()
         worker.onmessage = (event) => {
           const { danmus, id } = event.data
           if (!id || !danmus)

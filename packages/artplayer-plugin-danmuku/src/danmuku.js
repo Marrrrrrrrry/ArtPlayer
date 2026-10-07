@@ -62,7 +62,7 @@ export default class Danmuku {
     art.on('resize', this.resize)
 
     // 开始加载弹幕
-    this.load().catch(() => {})
+    this.load().catch(error => console.warn('[artplayerPluginDanmuku] load failed:', error))
   }
 
   // 默认配置

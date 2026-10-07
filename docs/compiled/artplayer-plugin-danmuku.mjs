@@ -68,7 +68,8 @@ function bilibiliDanmuParseFromUrl(url) {
     return await new Promise((resolve, reject) => {
       try {
         const worker = createWorker();
-        const timeout = setTimeout(() => reject(new Error("danmaku parse timeout")), 1e4);
+        const timeout = setTimeout(() => reject(new Error("danmuku parse timeout")), 1e4);
+        worker.terminate();
         worker.onmessage = (event) => {
           const { danmus, id } = event.data;
           if (!id || !danmus)
@@ -158,8 +159,7 @@ class Danmuku {
     art.on("video:waiting", this.stop);
     art.on("destroy", this.destroy);
     art.on("resize", this.resize);
-    this.load().catch(() => {
-    });
+    this.load().catch((error) => console.warn("[artplayerPluginDanmuku] load failed:", error));
   }
   // 默认配置
   static get option() {
